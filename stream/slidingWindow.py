@@ -23,22 +23,22 @@ class SlidingWindow():
         
         return Window(self.actual_window, self.has_context)
     
-    def __call__(self, func):
-        return func(Window(self.start_window, self.has_context), Window(self.actual_window, self.has_context))
+    def __call__(self, func, *args):
+        return func(Window(self.start_window, self.has_context), Window(self.actual_window, self.has_context), *args)
     
     
     def get_actual_instance(self, with_context=False):
         if self.index != 0:
             if self.has_context and not with_context:
-                return self.all_stream.loc[[self.index-1]].iloc[:, :-1]
+                return self.all_stream.loc[[self.index-1]].iloc[:, :-1].reset_index(drop=True)
             else:
-                return self.all_stream.loc[[self.index-1]].iloc[:, :]
+                return self.all_stream.loc[[self.index-1]].iloc[:, :].reset_index(drop=True)
             
-        return self.all_stream.loc[[self.index]]
+        return self.all_stream.loc[[self.index]].reset_index(drop=True)
     
     def get_actual_context(self):
         if self.has_context:    
-            return self.get_actual_instance(with_context=True).iloc[:, -1].iloc[0]
+            return self.get_actual_instance(with_context=True).iloc[:, -1].loc[0]
         else:
             raise KeyError("Context not instanciated, please set the context list first")
         
@@ -75,11 +75,11 @@ class Window:
     
     def features(self):
         c = 2 if self.has_context else 1
-        return self.window.iloc[:, :-c]
+        return self.window.iloc[:, :-c].reset_index(drop=True)
     
     def labels(self):
         c = 2 if self.has_context else 1
-        return self.window.iloc[:, -c]
+        return self.window.iloc[:, -c].reset_index(drop=True)
     
     def get_prevalence(self, return_class=1):
         return self.labels().value_counts(normalize=True)[return_class]

@@ -20,7 +20,7 @@ def generate_samples_binary(batch:pd.DataFrame,
         if pos_class_size is not sample_size:
             positive_samples = positives.sample(pos_class_size, replace=True)
         else:
-            positive_samples = negatives.sample(frac=1, replace=False)
+            positive_samples = negatives.sample(frac=1, replace=True)
 
         negative_samples = negatives.sample(int(neg_class_size), replace=True)
         
