@@ -5,13 +5,16 @@ from typing import Any
 class Detector(ABC):
     """Abstract class for drift detectors"""
     
+    @abstractmethod
+    def __call__(self, current_window:pd.DataFrame) -> None:
+        pass
     
     @abstractmethod
     def fit(self, ref_window:pd.DataFrame) -> None:
         pass
     
     @abstractmethod
-    def detect(self, *current_window:pd.DataFrame) -> bool:
+    def detect(self, current_window:pd.DataFrame) -> bool:
         pass
     
     

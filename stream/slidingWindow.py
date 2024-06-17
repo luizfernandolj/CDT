@@ -47,9 +47,8 @@ class SlidingWindow():
         self.has_context = True
         
     
-    def drift_detected(self, detected):
-        if detected:
-            self.start_window = self.actual_window
+    def switch(self):
+        self.start_window = self.actual_window
             
         
     
@@ -84,13 +83,15 @@ class Window:
     def get_prevalence(self, return_class=1):
         return self.labels().value_counts(normalize=True)[return_class]
     
-    def __getitem__(self, start=None, end=None):
-        if not start:
-            start = 0
-        if not end:
-            end = start+1
-        
-        return self.window.iloc[start:end]           
+    def get_instances_context(self, context:int) -> pd.DataFrame:
+        if self.has_context:
+            context_df = self.window.query("context == @context")
+            if context != None:
+                return context_df
+            else:
+                return False
+
+               
     
     def __str__(self):
         return f"{self.window}"
