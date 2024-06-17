@@ -29,6 +29,9 @@ class CDT(Detector):
     # get scores from train
     # create multiple tests
     # get dys distance from each test set
+    def __call__(self, current_window: pd.DataFrame) -> None:
+        pass
+    
     
     def fit(self, ref_window: pd.DataFrame) -> None: 
         self.ref_window = ref_window
@@ -41,10 +44,7 @@ class CDT(Detector):
         
         for m in np.arange(0.1, 1, 0.1):
             scores = MoSS(len(ref_window), m, self.pos_scores, self.neg_scores)
-            sns.histplot(scores)
-            plt.show() 
             dys_distance = get_dys_distance(self.pos_scores, self.neg_scores, scores)
-            print(dys_distance)
             self.distances.append(dys_distance)    
             
         
@@ -55,7 +55,6 @@ class CDT(Detector):
     def detect(self, current_window: pd.DataFrame) -> bool:
         test_scores = self.classifier.predict_proba(current_window)
         dys_distance = np.round(get_dys_distance(self.pos_scores, self.neg_scores, test_scores), 5)
-        print(dys_distance, self.threshold)
         if dys_distance < self.threshold[0] or dys_distance > self.threshold[1]:
             return True
         return False

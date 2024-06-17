@@ -1,4 +1,4 @@
-from Treap import Treap
+from detectors.iks_code.Treap import Treap
 from math import log
 
 class IKS:

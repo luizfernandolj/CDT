@@ -48,30 +48,40 @@ def run(dataset:str,
     start_window = train.iloc[-window_size:]
     
     
-    detector.fit(start_window)
+    detector.fit(train)
     
-    sliding_window = SlidingWindow(start_window=start_window, test=test, has_context=True)
+    sliding_window = SlidingWindow(start_window=start_window, stream=test, has_context=True)
     
     
     def f(start_window:Window, current_window:Window, detector:Detector) -> bool:
         return detector.detect(current_window.features())
     
     
-    result = {"drifs_detected":0, "drifs_detected_at":[], "time":0, "context_portion":0}
+    result = {"drifs_detected":0, 
+              "drifs_detected_at":[], 
+              "time (s)":0, 
+              "context_portion":0,
+              "classification":np.zeros(len(test))}
+    
+    proportions = []
+    
     start = time.time()
     # RUNNING SLIDING WINDOW
     for i, window in enumerate(sliding_window):
         print(f"instance {i}", end="\r")
+        
+        proportions.append(window.get_prevalence(1))
+        result["classification"][i] = int(classifier.predict(window.features().iloc[[-1]])[0])
 
         detector(window.features())
         
         detected = sliding_window(f, detector)
         if detected:
-            print("drift detected at {i}")
+            print(f"drift detected at {i}")
             result["drifs_detected_at"].append(i)
             result["drifs_detected"]= result["drifs_detected"] + 1
             
-            if window.get_instances_context(2) and result["context_portion"] == 0:
+            if window.get_instances_context(2) is not None and result["context_portion"] == 0:
                 context_portion = len(window.get_instances_context(2))/window_size
                 result["context_portion"] = context_portion
                 # TODO: cotext 2 portion
@@ -81,12 +91,14 @@ def run(dataset:str,
             sliding_window.switch()
     end = time.time()
     
-    result["time"] = end - start
+    result["time (s)"] = round(end - start, 3)
+    result["classification"] = result["classification"].tolist()
     
+    with open(f"{path_results}/{dataset}_{detector_name}.json", "w") as detec_inf:
+        json.dump(result, detec_inf)
     
-    out_file = open(f"{path_results}/{detector_name}.json", "w") 
-    json.dump(result, out_file)
-    out_file.close()
+    with open(f"{path_results}/{dataset}_proportions.json", "w") as prop:
+        json.dump(proportions, prop)
         
 
 
@@ -101,7 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('detector', type=str)
     args = parser.parse_args()
     
-    path_train = f"{os.getcwd()}/datasets/training/{args.dataset}.train.csv"
+    path_train = f"{os.getcwd()}/datasets/train/{args.dataset}.train.csv"
     path_test = f"{os.getcwd()}/datasets/test/{args.dataset}.test.csv"
     path_results = f"{os.getcwd()}/results"
     
@@ -110,17 +122,17 @@ if __name__ == '__main__':
     detector = None
     
     if args.detector == "CDT":
-        detector = CDT(classifier=classifier)
+        detector = CDT(classifier=classifier, p=3)
     if args.detector == "IKS":
         ca = 1.95
         detector = IKS(ca=ca)
     if args.detector == "IBDD":
-        consecutive_values = 0.001
-        detector = IBDD(consecutive_values=consecutive_values)        
+        epsilon = 30
+        detector = IBDD(consecutive_values=epsilon, n_runs=20, dataset=args.dataset, window_size=args.window_size)        
     
     
     run(args.dataset, args.window_size, path_train, path_test, path_results, classifier, detector, args.detector)
-    print("End")
+    print("\nEnd")
     
     
     

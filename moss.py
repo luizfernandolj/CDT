@@ -12,6 +12,7 @@ def MoSS(n, m, pos, neg):
 
   # Combine both functions using set union
   moss = np.union1d(syn_plus, syn_minus)
+  print(moss)
 
   return moss
 

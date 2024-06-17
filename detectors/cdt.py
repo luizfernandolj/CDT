@@ -10,7 +10,7 @@ import numpy as np
 
 class CDT(Detector):
     
-    def __init__(self,classifier, train_split_size:float=0.5, n_train_test_samples:int=100, p:int=1) -> None:
+    def __init__(self,classifier, train_split_size:float=0.5, n_train_test_samples:int=100, p:int=5) -> None:
         self.train_split_size = train_split_size
         self.distances = []
         self.threshold = None
@@ -28,6 +28,10 @@ class CDT(Detector):
     # get scores from train
     # create multiple tests
     # get dys distance from each test set
+    def __call__(self, current_window: pd.DataFrame) -> None:
+        pass
+    
+    
     def _create_train_test(self, window:pd.DataFrame) -> list:        
         window = window.reset_index(drop=True)
         window.drop("context", axis=1, inplace=True)
@@ -54,7 +58,6 @@ class CDT(Detector):
         for sample in samples:
             test_scores = self.classifier.predict_proba(sample)
             dys_distance = get_dys_distance(self.pos_scores, self.neg_scores, test_scores)
-            print(dys_distance)
             self.distances.append(dys_distance)    
             
         
@@ -65,7 +68,7 @@ class CDT(Detector):
     def detect(self, current_window: pd.DataFrame) -> bool:
         test_scores = self.classifier.predict_proba(current_window)
         dys_distance = np.round(get_dys_distance(self.pos_scores, self.neg_scores, test_scores), 5)
-        print(dys_distance, self.threshold)
+        #print(dys_distance, self.threshold)
         if dys_distance < self.threshold[0] or dys_distance > self.threshold[1]:
             return True
         return False
