@@ -53,7 +53,7 @@ class CDT(Detector):
         
         self.pos_scores, self.neg_scores, self.classifier = get_train_values(X, Y, 20, self.classifier)
 
-        samples = generate_samples_binary(test, self.n_train_test_samples, int(len(X)))
+        samples = generate_samples_binary(test, self.n_train_test_samples, int(len(ref_window)))
         
         for sample in samples:
             test_scores = self.classifier.predict_proba(sample)
