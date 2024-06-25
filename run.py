@@ -48,7 +48,7 @@ def run(dataset:str,
     start_window = train.iloc[-window_size:]
     
     
-    detector.fit(train)
+    detector.fit(X_train, y_train)
     
     sliding_window = SlidingWindow(start_window=start_window, stream=test, has_context=True)
     
@@ -71,7 +71,9 @@ def run(dataset:str,
         print(f"instance {i}", end="\r")
         
         proportions.append(window.get_prevalence(1))
-        result["classification"][i] = int(classifier.predict(window.features().iloc[[-1]])[0])
+        classification = int(classifier.predict(window.features().iloc[[-1]])[0])
+        if classification == window.labels().iloc[-1]:
+            result["classification"][i] = 1
 
         detector(window.features())
         
@@ -84,10 +86,9 @@ def run(dataset:str,
             if window.get_instances_context(2) is not None and result["context_portion"] == 0:
                 context_portion = len(window.get_instances_context(2))/window_size
                 result["context_portion"] = context_portion
-                # TODO: cotext 2 portion
             
             classifier.fit(window.features(), window.labels())
-            detector.fit(window.window)
+            detector.fit(window.features(), window.labels())
             sliding_window.switch()
     end = time.time()
     
@@ -106,6 +107,8 @@ def run(dataset:str,
 
 if __name__ == '__main__':
     print("Starting")
+    
+    files2del = ['w1.jpeg', 'w2.jpeg', 'w1_cv.jpeg', 'w2_cv.jpeg']
     
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str)
@@ -132,6 +135,10 @@ if __name__ == '__main__':
     
     
     run(args.dataset, args.window_size, path_train, path_test, path_results, classifier, detector, args.detector)
+    
+    for f in files2del:
+        os.remove(f"detectors/for_ibdd/{args.dataset}/{f}")
+    
     print("\nEnd")
     
     

@@ -15,8 +15,8 @@ class IKS(Detector):
         self.ikssw.Increment(instance)
         
     
-    def fit(self, ref_window:pd.DataFrame) -> None:
-        self.ikssw = IKSSW(ref_window.iloc[:, :-2].values.tolist())
+    def fit(self, X_ref_window: pd.DataFrame, y_ref_window: pd.DataFrame) -> None:
+        self.ikssw = IKSSW(X_ref_window.values.tolist())
     
     def detect(self, current_window:pd.DataFrame=None) -> bool:
         return self.ikssw.Test(self.ca)

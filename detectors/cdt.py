@@ -34,7 +34,6 @@ class CDT(Detector):
     
     def _create_train_test(self, window:pd.DataFrame) -> list:        
         window = window.reset_index(drop=True)
-        window.drop("context", axis=1, inplace=True)
         #window = window.sample(frac=1, replace=False, random_state=32)
         
         size = int(len(window) * self.train_split_size)
@@ -47,13 +46,13 @@ class CDT(Detector):
         
         return [X_train, y_train, test]
         
-    def fit(self, ref_window: pd.DataFrame) -> None: 
-        self.ref_window = ref_window
-        X, Y, test = self._create_train_test(ref_window)
+    def fit(self, X_ref_window: pd.DataFrame, y_ref_window: pd.DataFrame) -> None: 
+        self.ref_window = pd.concat([X_ref_window, y_ref_window], axis=1)
+        X, Y, test = self._create_train_test(self.ref_window)
         
         self.pos_scores, self.neg_scores, self.classifier = get_train_values(X, Y, 20, self.classifier)
 
-        samples = generate_samples_binary(test, self.n_train_test_samples, int(len(ref_window)))
+        samples = generate_samples_binary(test, self.n_train_test_samples, int(len(self.ref_window)))
         
         for sample in samples:
             test_scores = self.classifier.predict_proba(sample)

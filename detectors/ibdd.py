@@ -25,7 +25,6 @@ class IBDD(Detector):
         self.w2 = None
         self.last_update = 0
         self.i = 0
-        self.files2del = ['w1.jpeg', 'w2.jpeg', 'w1_cv.jpeg', 'w2_cv.jpeg']
         
     def _get_imgdistribution(self, file_name:str, data) -> np.any:
         plt.imsave(f"{os.getcwd()}/detectors/for_ibdd/{self.dataset}/{file_name}", data.transpose(), cmap = 'Greys', dpi=100)
@@ -67,13 +66,13 @@ class IBDD(Detector):
             self.last_update = self.i
         self.i = self.i + 1
     
-    def fit(self, ref_window:pd.DataFrame) -> None:
-        train_features = ref_window.iloc[:, :-2]
+    def fit(self, X_ref_window: pd.DataFrame, y_ref_window: pd.DataFrame) -> None:
+        train_features = X_ref_window
         self.superior_threshold, self.inferior_threshold, self.nrmse = self._find_initial_threshold(train_features,
                                                                                                     self.window_size,
                                                                                                     self.n_runs)
         self.threshold_diffs = [self.superior_threshold - self.inferior_threshold]
-        if len(ref_window) > self.window_size:
+        if len(X_ref_window) > self.window_size:
             self.w1 = self._get_imgdistribution("w1.jpeg", train_features.iloc[-self.window_size:])
         else:
             self.w1 = self._get_imgdistribution("w1.jpeg", train_features)

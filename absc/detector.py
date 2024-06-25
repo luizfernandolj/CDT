@@ -6,7 +6,7 @@ class Detector(ABC):
     """Abstract class for drift detectors"""
     
     @abstractmethod
-    def fit(self, ref_window:pd.DataFrame) -> None:
+    def fit(self, X_ref_window:pd.DataFrame, y_ref_window:pd.DataFrame) -> None:
         pass
     
     @abstractmethod
