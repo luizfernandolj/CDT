@@ -7,6 +7,8 @@ import json
 from detectors.cdt import CDT
 from detectors.iks import IKS
 from detectors.ibdd import IBDD
+from detectors.wrs import WRS
+from detectors.baseline import BASELINE
 from absc.detector import Detector
 from stream.slidingWindow import SlidingWindow, Window
 from sklearn.ensemble import RandomForestClassifier
@@ -24,7 +26,8 @@ def run(dataset:str,
         path_results:str,
         classifier:np.any,
         detector:Detector,
-        detector_name:str):
+        detector_name:str,
+        has_context:bool):
     print()
     
     if detector is None:
@@ -33,16 +36,21 @@ def run(dataset:str,
     ibdd_dir = f"{os.getcwd()}/detectors/for_ibdd/{dataset}"
     initialize_ibdd_folder(ibdd_dir)
     
+    if has_context:
+        a = 2
+    else:
+        a = 1
+    
     # IMPORTING DATASETS
-    train = pd.read_csv(path_train)
-    test = pd.read_csv(path_test)
-    train['class'] = train["class"].replace(2, 0)
-    test["class"] = test["class"].replace(2, 0)
+    train = pd.read_csv(path_train, )
+    test = pd.read_csv(path_test, )
+    train.replace({list(train.columns)[-a]:{2:0}}, inplace=True)
+    test.replace({list(train.columns)[-a]:{2:0}}, inplace=True)
     
     # FITTING CLASSIFIER INTO TRAIN DATASET
-    X_train = train.drop(["class", "context"], axis=1)
-    y_train = train["class"]
-    classifier.fit(X_train, y_train)
+    X_train = train.iloc[:, :-a]
+    y_train = train.iloc[:, -a]
+    classifier.fit(X_train.values, y_train.values)
     
     # START WINDOW
     start_window = train.iloc[-window_size:]
@@ -50,7 +58,7 @@ def run(dataset:str,
     
     detector.fit(X_train, y_train)
     
-    sliding_window = SlidingWindow(start_window=start_window, stream=test, has_context=True)
+    sliding_window = SlidingWindow(start_window=start_window, stream=test, has_context=has_context)
     
     
     def f(start_window:Window, current_window:Window, detector:Detector) -> bool:
@@ -68,10 +76,11 @@ def run(dataset:str,
     start = time.time()
     # RUNNING SLIDING WINDOW
     for i, window in enumerate(sliding_window):
-        print(f"instance {i}", end="\r")
+        print(f"instance {i+1}", end="\r")
         
+        #print(window.window)
         proportions.append(window.get_prevalence(1))
-        classification = int(classifier.predict(window.features().iloc[[-1]])[0])
+        classification = classifier.predict(window.features().iloc[[-1]].values)
         if classification == window.labels().iloc[-1]:
             result["classification"][i] = 1
 
@@ -87,7 +96,7 @@ def run(dataset:str,
                 context_portion = len(window.get_instances_context(2))/window_size
                 result["context_portion"] = context_portion
             
-            classifier.fit(window.features(), window.labels())
+            classifier.fit(window.features().values, window.labels().values)
             detector.fit(window.features(), window.labels())
             sliding_window.switch()
     end = time.time()
@@ -106,7 +115,6 @@ def run(dataset:str,
 
 
 if __name__ == '__main__':
-    print("Starting")
     
     files2del = ['w1.jpeg', 'w2.jpeg', 'w1_cv.jpeg', 'w2_cv.jpeg']
     
@@ -116,28 +124,50 @@ if __name__ == '__main__':
     parser.add_argument('detector', type=str)
     args = parser.parse_args()
     
+    
+    print(f"Starting -> {args.detector}")
+    
+    
     path_train = f"{os.getcwd()}/datasets/train/{args.dataset}.train.csv"
     path_test = f"{os.getcwd()}/datasets/test/{args.dataset}.test.csv"
     path_results = f"{os.getcwd()}/results"
     
     classifier = RandomForestClassifier(n_estimators=200, n_jobs=-1)
+    clf_cdt = RandomForestClassifier(n_estimators=200, n_jobs=-1)
     
     detector = None
     
     if args.detector == "CDT":
-        detector = CDT(classifier=classifier, p=3)
+        p = 0
+        detector = CDT(classifier=clf_cdt, p=p)
     if args.detector == "IKS":
         ca = 1.95
         detector = IKS(ca=ca)
     if args.detector == "IBDD":
-        epsilon = 30
-        detector = IBDD(consecutive_values=epsilon, n_runs=20, dataset=args.dataset, window_size=args.window_size)        
+        epsilon = 40
+        detector = IBDD(consecutive_values=epsilon, n_runs=20, dataset=args.dataset, window_size=args.window_size)
+    if args.detector == "WRS":
+        threshold = 0.001
+        detector = WRS(threshold=threshold, window_size=args.window_size)
+    if args.detector == "BASELINE":
+        detector = BASELINE() 
+        
+    has_context = True       
     
     
-    run(args.dataset, args.window_size, path_train, path_test, path_results, classifier, detector, args.detector)
+    run(args.dataset, 
+        args.window_size, 
+        path_train, 
+        path_test, 
+        path_results, 
+        classifier, 
+        detector, 
+        args.detector,
+        has_context)
     
     for f in files2del:
-        os.remove(f"detectors/for_ibdd/{args.dataset}/{f}")
+        if os.path.isdir(f"detectors/for_ibdd/{args.dataset}/{f}"):
+            os.remove(f"detectors/for_ibdd/{args.dataset}/{f}")
     
     print("\nEnd")
     

@@ -63,7 +63,7 @@ class IKSSW:
     for val in self.reference:
       self.iks.Add(val, 1)
   
-  def Test(self, ca):
+  def Test(self, ca = 1.95):
     '''Test whether the reference and sliding window follow the different probability distributions according to KS Test.
 
     Args:

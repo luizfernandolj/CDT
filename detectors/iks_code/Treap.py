@@ -53,7 +53,7 @@ class Treap:
     node.height += 1
   
   @classmethod
-  def SplitKeepRight(cls, node:float, key:float):
+  def SplitKeepRight(cls, node, key):
     if node is None:
       return None, None
 

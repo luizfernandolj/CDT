@@ -41,8 +41,8 @@ class CDT(Detector):
         train = window.iloc[:size]
         test = window.iloc[size:]
         
-        X_train = train.drop(["class"], axis=1)
-        y_train = train["class"]
+        X_train = train.iloc[:, :-1]
+        y_train = train.iloc[:, -1]
         
         return [X_train, y_train, test]
         
@@ -50,9 +50,9 @@ class CDT(Detector):
         self.ref_window = pd.concat([X_ref_window, y_ref_window], axis=1)
         X, Y, test = self._create_train_test(self.ref_window)
         
-        self.pos_scores, self.neg_scores, self.classifier = get_train_values(X, Y, 20, self.classifier)
+        self.pos_scores, self.neg_scores, self.classifier = get_train_values(X, Y, 10, self.classifier)
 
-        samples = generate_samples_binary(test, self.n_train_test_samples, int(len(self.ref_window)))
+        samples = generate_samples_binary(test, self.n_train_test_samples, int(len(self.ref_window)), label_column=list(test.columns)[-1])
         
         for sample in samples:
             test_scores = self.classifier.predict_proba(sample)

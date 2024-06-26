@@ -64,18 +64,15 @@ class IBDD(Detector):
             self.inferior_threshold = np.mean(self.nrmse[-50:]) - 2 * np.std(self.nrmse[-50:])
             self.threshold_diffs.append(self.superior_threshold - self.inferior_threshold)
             self.last_update = self.i
-        self.i = self.i + 1
     
     def fit(self, X_ref_window: pd.DataFrame, y_ref_window: pd.DataFrame) -> None:
         train_features = X_ref_window
-        self.superior_threshold, self.inferior_threshold, self.nrmse = self._find_initial_threshold(train_features,
-                                                                                                    self.window_size,
-                                                                                                    self.n_runs)
-        self.threshold_diffs = [self.superior_threshold - self.inferior_threshold]
-        if len(X_ref_window) > self.window_size:
-            self.w1 = self._get_imgdistribution("w1.jpeg", train_features.iloc[-self.window_size:])
-        else:
-            self.w1 = self._get_imgdistribution("w1.jpeg", train_features)
+        if self.nrmse is None:
+            self.superior_threshold, self.inferior_threshold, self.nrmse = self._find_initial_threshold(train_features,
+                                                                                                        self.window_size,
+                                                                                                        self.n_runs)
+            self.threshold_diffs = [self.superior_threshold - self.inferior_threshold]   
+            self.w1 = self._get_imgdistribution("w1.jpeg", train_features[-self.window_size:])
     
     def detect(self, current_window:pd.DataFrame) -> bool:
         if (all(i >= self.superior_threshold for i in self.nrmse[-self.consecutive_values:])):
@@ -91,5 +88,6 @@ class IBDD(Detector):
             self.threshold_diffs.append(self.superior_threshold - self.inferior_threshold)
             self.last_update = self.i
             return True
+        self.i = self.i + 1
         return False
         
