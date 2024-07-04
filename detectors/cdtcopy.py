@@ -1,15 +1,15 @@
 from absc.detector import Detector
 from utils.generate_samples import generate_samples_binary
-from quantification.dys_method import get_dys_distance
+from quantification.dys_syn import get_dys_distance
 from utils.get_train_values import get_train_values
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from moss import MoSS, calculate_merging_factor
+from moss import MoSS
 
 
-class CDT(Detector):
+class CDT_syn(Detector):
     
     def __init__(self,classifier, train_split_size:float=0.5, n_train_test_samples:int=100, p:int=10) -> None:
         self.train_split_size = train_split_size
@@ -33,20 +33,15 @@ class CDT(Detector):
         pass
     
     
-    def fit(self, ref_window: pd.DataFrame) -> None: 
-        self.ref_window = ref_window.drop("context", axis=1)
+    
+    def fit(self, X_ref_window: pd.DataFrame, y_ref_window: pd.DataFrame) -> None:
+        self.ref_window = pd.concat([X_ref_window, y_ref_window], axis=1)
+        self.pos_scores, self.neg_scores, self.classifier = get_train_values(X_ref_window, y_ref_window, 10, self.classifier)
         
-        X = self.ref_window.drop(["class"], axis=1)
-        Y = self.ref_window["class"]
         
-        self.pos_scores, self.neg_scores, self.classifier = get_train_values(X, Y, 10, self.classifier)
         
-        m = calculate_merging_factor(self.ref_window.iloc[-(int(len(ref_window)/2)):])
-        
-        for alpha in np.arange(0, 1, 0.1):
-            scores = MoSS(len(ref_window), alpha, m)
-            dys_distance = get_dys_distance(self.pos_scores, self.neg_scores, scores)
-            self.distances.append(dys_distance)  
+        dys_distance = get_dys_distance(scores)
+        self.distances.append(dys_distance)  
             
         
         self.threshold = np.percentile(self.distances, [self.p, (100-self.p)])
