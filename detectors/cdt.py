@@ -1,4 +1,4 @@
-from absc.detector import Detector
+from DataStream.base import Detector
 from utils.generate_samples import generate_samples_binary
 from quantification.dys_method import get_dys_distance
 from utils.get_train_values import get_train_values

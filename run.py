@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import json
 #from detectors.cdt import CDT
-from detectors.cdtcopy import CDT_syn
+from detectors.cdt_syn import CDT_syn
 from detectors.iks import IKS
 from detectors.ibdd import IBDD
 from detectors.wrs import WRS

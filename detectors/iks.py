@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from absc.detector import Detector
+from DataStream.base import Detector
 from detectors.iks_code.IKSSW import IKSSW
 from detectors.iks_code.IKS import IKS
 

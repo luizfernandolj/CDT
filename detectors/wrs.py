@@ -1,5 +1,5 @@
 import pandas as pd
-from absc.detector import Detector
+from DataStream.base import Detector
 from scipy import stats
 
 

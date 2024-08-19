@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from absc.detector import Detector
+from DataStream.base import Detector
 from skimage.io import imread
 from skimage.metrics import mean_squared_error, structural_similarity
 from scipy import stats
