@@ -5,13 +5,8 @@ import pandas as pd
 import numpy as np
 import json
 #from detectors.cdt import CDT
-from detectors.cdt_syn import CDT_syn
-from detectors.iks import IKS
-from detectors.ibdd import IBDD
-from detectors.wrs import WRS
-from detectors.baseline import BASELINE
-from absc.detector import Detector
-from stream.slidingWindow import SlidingWindow, Window
+from detectors import *
+from DataStream import *
 from sklearn.ensemble import RandomForestClassifier
 import argparse
 
@@ -26,44 +21,47 @@ def run(dataset:str,
         path_test:str,
         path_results:str,
         classifier:np.any,
-        detector:Detector,
         detector_name:str,
-        has_context:bool):
+        detector:Detector=None,
+        class_index:int=-1,
+        context_index:int=None):
     print()
-    
-    if detector is None:
-        raise Exception("No detector specified")
     
     ibdd_dir = f"{os.getcwd()}/detectors/for_ibdd/{dataset}"
     initialize_ibdd_folder(ibdd_dir)
     
-    if has_context:
-        a = 2
-    else:
-        a = 1
-    
     # IMPORTING DATASETS
-    train = pd.read_csv(path_train, )
-    test = pd.read_csv(path_test, )
-    train.replace({list(train.columns)[-a]:{2:0}}, inplace=True)
-    test.replace({list(train.columns)[-a]:{2:0}}, inplace=True)
+    train = pd.read_csv(path_train)
+    test = pd.read_csv(path_test)
     
-    # FITTING CLASSIFIER INTO TRAIN DATASET
-    X_train = train.iloc[:, :-a]
-    y_train = train.iloc[:, -a]
-    classifier.fit(X_train.values, y_train.values)
+    # SPLITTING DATASET
+    smaller = class_index if class_index < context_index else context_index
     
-    # START WINDOW
-    start_window = train.iloc[-window_size:]
+    # Splitting the train data
+    X_train = train.iloc[:, :smaller]
+    y_train = train.iloc[:, class_index]
     
+    
+    
+    # ============================== SPLIT THE STREAM DATA =================================
+    X_test = test.iloc[:, :smaller]
+    y_test = test.iloc[:, class_index]
+    
+    
+    if context_index is not None:
+        context_train = train.iloc[:, context_index]
+        context_test = test.iloc[:, context_index]
+
+    REF_WINDOW = Window(X_train.iloc[-window_size:], y_train.iloc[-window_size:], context_train)
+
+
+    STREAM = SlidingWindow(REF_WINDOW, X_test, y_test, context_test, window_size=window_size)
+    
+    # FITTING OBJECTS
+    classifier.fit(X_train, y_train)
     
     detector.fit(X_train, y_train)
     
-    sliding_window = SlidingWindow(start_window=start_window, stream=test, has_context=has_context)
-    
-    
-    def f(start_window:Window, current_window:Window, detector:Detector) -> bool:
-        return detector.detect(current_window.features())
     
     
     result = {"drifs_detected":0, 
@@ -76,18 +74,24 @@ def run(dataset:str,
     
     start = time.time()
     # RUNNING SLIDING WINDOW
-    for i, window in enumerate(sliding_window):
-        print(f"instance {i+1}", end="\r")
+    for i, window in enumerate(STREAM):
+        print(f"instance {i+1}/{len(STREAM)}", end="\r")
         
         #print(window.window)
+        # Getting the prevalences
         proportions.append(window.get_prevalence(1))
-        classification = classifier.predict(window.features().iloc[[-1]].values)
-        if classification == window.labels().iloc[-1]:
+        
+        # Predicting the first row of the stream
+        classification = classifier.predict(window.X.tail(1))[0]
+        
+        if classification == window.y.iloc[-1]:
             result["classification"][i] = 1
 
-        detector(window.features())
+        detector(window.X)
         
-        detected = sliding_window(f, detector)
+        # Detecting the drift
+        detected = detector.detect(window.X)
+        
         if detected:
             print(f"drift detected at {i}")
             result["drifs_detected_at"].append(i)
@@ -97,9 +101,11 @@ def run(dataset:str,
                 context_portion = len(window.get_instances_context(2))/window_size
                 result["context_portion"] = context_portion
             
-            classifier.fit(window.features().values, window.labels().values)
-            detector.fit(window.features(), window.labels())
-            sliding_window.switch()
+            classifier.fit(window.X, window.y)
+            detector.fit(window.X, window.y)
+            
+            STREAM.switch()
+            
     end = time.time()
     
     result["time (s)"] = round(end - start, 3)
@@ -126,7 +132,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     
-    print(f"Starting -> {args.detector}")
+    print(f"Starting -> {args.detector} on {args.dataset}")
     
     
     path_train = f"{os.getcwd()}/datasets/train/{args.dataset}.train.csv"
@@ -139,8 +145,9 @@ if __name__ == '__main__':
     detector = None
     
     if args.detector == "CDT":
-        p = 2
-        detector = CDT_syn(classifier=clf_cdt, p=p)
+        p = 1.5
+        train_size = 0.8
+        detector = CDT(classifier=clf_cdt, p=p, train_split_size=train_size)
     if args.detector == "IKS":
         ca = 1.95
         detector = IKS(ca=ca)
@@ -153,7 +160,9 @@ if __name__ == '__main__':
     if args.detector == "BASELINE":
         detector = BASELINE() 
         
-    has_context = True       
+    
+    class_index = -2
+    context_index = -1
     
     
     run(args.dataset, 
@@ -162,15 +171,16 @@ if __name__ == '__main__':
         path_test, 
         path_results, 
         classifier, 
-        detector, 
-        args.detector,
-        has_context)
+        detector.__class__.__name__, 
+        detector,
+        class_index,
+        context_index,)
     
     for f in files2del:
         if os.path.isdir(f"detectors/for_ibdd/{args.dataset}/{f}"):
             os.remove(f"detectors/for_ibdd/{args.dataset}/{f}")
     
-    print("\nEnd")
+    print(f"\nEnd {args.dataset} with {args.detector}")
     
     
     

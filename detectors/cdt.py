@@ -1,57 +1,81 @@
+import mlquantify as mq
+from sklearn.model_selection import train_test_split
 from DataStream.base import Detector
-from utils.generate_samples import generate_samples_binary
-from quantification.dys_method import get_dys_distance
-from utils.get_train_values import get_train_values
-import seaborn as sns
-import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
 
 class CDT(Detector):
-    def __init__(self, classifier, train_split_size: float = 0.5, n_train_test_samples: int = 100, p: int = 5) -> None:
+    def __init__(self, classifier, train_split_size: float = 0.5, n_train_test_samples: int = 100, p: int = 3) -> None:
         self.train_split_size = train_split_size
         self.distances = []
         self.threshold = None
         self.p = p
         self.ref_window = None
-        self.classifier = classifier
         self.n_train_test_samples = n_train_test_samples
-        self.pos_scores = None
-        self.neg_scores = None
-        self.scores = None
+        self.dys = mq.methods.DyS(classifier)
+      
         
     def __call__(self, current_window):
         pass
+    
+    
+    def _get_threshold(self, X, Y):
 
-    def _create_train_test(self, window: pd.DataFrame) -> tuple:
-        window = window.reset_index(drop=True)
-        size = int(len(window) * self.train_split_size)
-        train, test = window.iloc[:size], window.iloc[size:]
-        X_train, y_train = train.iloc[:, :-1], train.iloc[:, -1]
-        return X_train, y_train, test
+        args = [(prev, X, Y, self.dys) for prev in np.linspace(0, 1, self.n_train_test_samples)]
+        
+        train_distances = np.asarray(
+            mq.utils.parallel(
+                make_artificiall_sample,
+                args,
+                n_jobs=-1
+            )
+        )
+        train_distances = np.append(train_distances, self.dys.best_distance(X))
+        
+        mean = np.mean(train_distances)
+        std = np.std(train_distances)
+    
+        return mean + (self.p*std)
+    
+
+
+    def _create_train_test(self, X_window: pd.DataFrame, y_window:pd.DataFrame) -> tuple:
+        X_train, X_val, y_train, y_val = train_test_split(X_window, 
+                                                          y_window, 
+                                                          train_size=self.train_split_size, 
+                                                          shuffle=False,
+                                                          random_state=32)
+        
+        X_train = X_train.reset_index(drop=True)
+        X_val = X_val.reset_index(drop=True)
+        y_val = y_val.reset_index(drop=True)
+        y_train = y_train.reset_index(drop=True)
+                
+        return X_train, y_train, X_val, y_val
+
 
     def fit(self, X_ref_window: pd.DataFrame, y_ref_window: pd.DataFrame) -> None:
-        self.ref_window = pd.concat([X_ref_window, y_ref_window], axis=1)
-        X, Y, test = self._create_train_test(self.ref_window)
-        self.pos_scores, self.neg_scores, self.classifier = get_train_values(X, Y, 10, self.classifier)
-        samples = generate_samples_binary(test, self.n_train_test_samples, len(self.ref_window), label_column=test.columns[-1])
         
-        for sample in samples:
-            test_scores = self.classifier.predict_proba(sample)[:, 1]
-            dys_distance = get_dys_distance(self.pos_scores, self.neg_scores, test_scores)
-            self.distances.append(dys_distance)
+        X, Y, X_val, Y_val = self._create_train_test(X_ref_window, y_ref_window)
         
-        ref_scores = self.classifier.predict_proba(X_ref_window)[:, 1]
-        dys_distance = get_dys_distance(self.pos_scores, self.neg_scores, ref_scores)
-        self.distances.append(dys_distance)
+        self.dys.fit(X, Y)
         
-        self.threshold = np.percentile(self.distances, [self.p, 100 - self.p])
-        self.scores = ref_scores
+        self.threshold = self._get_threshold(X_val, Y_val)
+        
+        return self
 
-    def detect(self, current_window: pd.DataFrame) -> bool:
-        new_instance = current_window.tail(1)
-        score = self.classifier.predict_proba(new_instance)[:, 1]
-        self.scores = np.concatenate((self.scores, score))[1:]
-        dys_distance = np.round(get_dys_distance(self.pos_scores, self.neg_scores, self.scores), 5)
-        return dys_distance < self.threshold[0] or dys_distance > self.threshold[1]
+    def detect(self, X_current_window) -> bool:
+        distance = self.dys.best_distance(X_current_window)
+        return distance >= self.threshold
+
+
+def make_artificiall_sample(args):
+    pos, X, y, dys = args
+    
+    prev = [1-pos, pos]
+    indexes = mq.utils.generate_artificial_indexes(y, prev, len(X), np.unique(y))
+    
+    X_sample = X.iloc[indexes]
+    distance = dys.best_distance(X_sample)
+    return distance

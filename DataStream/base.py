@@ -14,6 +14,14 @@ class Detector(ABC):
     def detect(self, current_window:pd.DataFrame) -> bool:
         pass
     
+    @property
+    def classifier(self):
+        return self.classifier_
+
+    @classifier.setter
+    def classifier(self, value):
+        self.classifier_ = value
+    
     
     
 
@@ -22,10 +30,6 @@ class Window:
     """
     
     def __init__(self, X, y, context=None):
-        assert isinstance(context, pd.Series) or isinstance(context, np.ndarray) or not context
-        assert isinstance(X, pd.Series) or isinstance(X, np.ndarray)
-        assert isinstance(Y, pd.Series) or isinstance(Y, np.ndarray) 
-        
         self.X = X
         self.y = y
         self.context = context
@@ -33,8 +37,8 @@ class Window:
         self.index = 0
         
     
-    def _get_window(X, y, context):
-        if context:
+    def _get_window(self, X, y, context):
+        if context is not None:
             return pd.concat([X, y, context], axis=1, ignore_index=True)
         return pd.concat([X, y], ignore_index=True)    
     
@@ -50,6 +54,23 @@ class Window:
             
         self.index += 1
         return row
+    
+    def append(self, X_row, y_row, context_row): 
+        # Adiciona a linha `X_row` ao DataFrame `self.X`
+        self.X = pd.concat([self.X, X_row.to_frame().T], axis=0, ignore_index=True)[1:]
+
+        # Adiciona a linha `y_row` ao DataFrame `self.y`
+        self.y = pd.concat([self.y, y_row], axis=0, ignore_index=True)[1:]
+
+        if self.context is not None:
+            # Adiciona a linha `context_row` ao DataFrame `self.context`
+            self.context = pd.concat([self.context, context_row], axis=0, ignore_index=True)[1:]
+            
+            # Concatena `self.X`, `self.y`, e `self.context` em `self.window`
+            self.window = pd.concat([self.X, self.y, self.context], axis=1, ignore_index=True)
+        else:
+            # Concatena apenas `self.X` e `self.y` em `self.window`
+            self.window = pd.concat([self.X, self.y], axis=1, ignore_index=True)
 
 
     def get_prevalence(self, return_class=None):
@@ -59,12 +80,11 @@ class Window:
         return prevs
     
     def get_instances_context(self, context:int) -> pd.DataFrame:
-        if self.context:
-            context_df =  self.window[self.window.iloc[:, -1] == context]
-            if context_df != None:
+        if self.context is not None:
+            context_df = self.window[self.window.iloc[:, -1] == context]
+            if context_df is not None:
                 return context_df
-            print(f"There is no context {context} in this window")
-            return False
+            return None
         raise ValueError("No context was specified")
     
     def __str__(self):
