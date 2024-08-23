@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 
 
-DATASET = "AedesQuinx"
+DATASET = "Wine"
 WINDOW_SIZE = 1000
 
 train = pd.read_csv(f"datasets/train/{DATASET}.train.csv")
@@ -50,4 +50,9 @@ for i, window in enumerate(STREAM):
 
 
 sns.lineplot(distances)
+plt.xlabel("Instances")
+plt.ylabel("Distances")
+plt.title(f"Distances of each window on {DATASET}")
+plt.savefig(f"distances_{DATASET}.pdf", format='pdf')
 plt.show()
+print()
